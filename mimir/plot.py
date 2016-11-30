@@ -22,7 +22,7 @@ def get_socket(x_key, y_key, host='localhost', push_port=5557,
     x_key : str
         The key in the serialized JSON object that contains the x-axis
         value.
-    y_key : str
+    y_keys : list of str
         See `x_key`.
     push_port : int
         The port over which entries are pushed by the server.
@@ -52,14 +52,16 @@ def get_socket(x_key, y_key, host='localhost', push_port=5557,
     subscriber = connect(host=host, port=push_port, ctx=ctx)
 
     sequence = 0
-    x, y = [], []
+    x = []
+    y = dict(key=[] for key in y_keys)
 
     if persistent:
         sequence, entries = get_snapshot(port=router_port, ctx=ctx, **kwargs)
         for entry in entries:
-            if x_key in entry and y_key in entry:
+            if x_key in entry and all(y_key in entry for y_key in y_keys):
                 x.append(entry[x_key])
-                y.append(entry[y_key])
+                for y_key in y_keys:
+                    y[y_key].append(entry[y_key])
 
     return subscriber, sequence, x, y
 
@@ -117,7 +119,7 @@ def serve_plot(x_key, y_key, **kwargs):
     return session
 
 
-def notebook_plot(x_key, y_key, **kwargs):
+def notebook_plot(x_key, y_keys, **kwargs):
     r"""Live plot log entries in the current notebook.
 
     Parameters
@@ -125,13 +127,13 @@ def notebook_plot(x_key, y_key, **kwargs):
     x_key : str
         The key in the serialized JSON object that contains the x-axis
         value.
-    y_key : str
+    y_key : list of str
         See `x_key`.
     \*\*kwargs
         Connection parameters passed to the `connect` function.
 
     """
-    subscriber, sequence, x, y = get_socket(x_key, y_key, **kwargs)
+    subscriber, sequence, x, y = get_socket(x_key, y_keys, **kwargs)
     output_notebook()
 
     fig = figure()
@@ -141,15 +143,15 @@ def notebook_plot(x_key, y_key, **kwargs):
     push_notebook(handle=handle)
 
     while True:
-        update(x_key, y_key, sequence, subscriber, plot)
+        update(x_key, y_keys, sequence, subscriber, plot)
         push_notebook(handle=handle)
 
 if __name__ == "__main__":
     # Assuming a Bokeh server is running, this will create a live plot
     parser = argparse.ArgumentParser(description='Live stream plot')
     parser.add_argument('x_key')
-    parser.add_argument('y_key')
+    parser.add_argument('y_keys')
     args = parser.parse_args()
-    session = serve_plot(args.x_key, args.y_key)
+    session = serve_plot(args.x_key, args.y_keys)
     session.show()
     session.loop_until_closed()

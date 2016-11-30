@@ -101,6 +101,7 @@ class JSONHandler(FileHandler):
     def __init__(self, fp, **kwargs):
         super(JSONHandler, self).__init__(**kwargs)
         self.fp = fp
+        self.fp.write('[')
 
     def log(self, entry):
         self.fp.write(entry + '\n')
